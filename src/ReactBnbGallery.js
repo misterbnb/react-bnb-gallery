@@ -44,6 +44,10 @@ const propTypes = forbidExtraProps({
   keyboard: PropTypes.bool,
   opacity: opacityValidation,
   zIndex: nonNegativeInteger,
+  // custom props
+  className: PropTypes.string,
+  title: PropTypes.string,
+  outsideClickClose: PropTypes.bool,
 });
 
 const defaultProps = {
@@ -55,6 +59,9 @@ const defaultProps = {
   keyboard: true,
   opacity: DEFAULT_OPACITY,
   zIndex: DEFAULT_Z_INDEX,
+  title: '',
+  outsideClickClose: true,
+  className: '',
 };
 
 class ReactBnbGallery extends Component {
@@ -66,6 +73,25 @@ class ReactBnbGallery extends Component {
     this.gallery = React.createRef();
     this.close = this.close.bind(this);
     this.onKeyDown = this.onKeyDown.bind(this);
+    this.onClickOutside = this.onClickOutside.bind(this);
+    this.setGalleryModalContainerRef = this.setGalleryModalContainerRef.bind(this);
+    this.setGalleryContentRef = this.setGalleryContentRef.bind(this);
+  }
+
+  componentDidMount() {
+    if (typeof document === 'undefined') return;
+    const { outsideClickClose } = this.props;
+    if (outsideClickClose) {
+      document.body.addEventListener('click', this.onClickOutside);
+    }
+  }
+
+  componentWillUnmount() {
+    if (typeof document === 'undefined') return;
+    const { outsideClickClose } = this.props;
+    if (outsideClickClose) {
+      document.body.removeEventListener('click', this.onClickOutside);
+    }
   }
 
   static getDerivedStateFromProps(props, state) {
@@ -75,6 +101,13 @@ class ReactBnbGallery extends Component {
       };
     }
     return null;
+  }
+
+  onClickOutside(event) {
+    if (!this.galleryModalContainerRef || !this.galleryContentRef) return;
+    if (!event.target.closest(`.${this.galleryContentRef.className}`) && event.target.closest(`.${this.galleryModalContainerRef.className}`)) {
+      this.close();
+    }
   }
 
   onKeyDown(event) {
@@ -114,6 +147,14 @@ class ReactBnbGallery extends Component {
     };
   }
 
+  setGalleryModalContainerRef(element) {
+    this.galleryModalContainerRef = element;
+  }
+
+  setGalleryContentRef(element) {
+    this.galleryContentRef = element;
+  }
+
   close() {
     const { onClose } = this.props;
     onClose();
@@ -125,6 +166,8 @@ class ReactBnbGallery extends Component {
       phrases,
       keyboard,
       light,
+      className,
+      title,
       // abstract the user to use 'zIndex' instead of 'zindex'
       zIndex: zindex,
     } = this.props;
@@ -166,6 +209,7 @@ class ReactBnbGallery extends Component {
             className={classnames([
               'gallery-modal',
               light && 'mode-light',
+              className
             ])}
             zindex={zindex}
             onKeyDown={keyboard && this.onKeyDown}
@@ -176,7 +220,10 @@ class ReactBnbGallery extends Component {
               style={galleryModalOverlayStyles}
               className="gallery-modal--overlay"
             />
-            <div className="gallery-modal--container">
+            <div
+              className="gallery-modal--container"
+              ref={this.setGalleryModalContainerRef}
+            >
               <div className="gallery-modal--table">
                 <div className="gallery-modal--cell">
                   <div className="gallery-modal--content">
@@ -186,9 +233,12 @@ class ReactBnbGallery extends Component {
                         light={light}
                       />
                     </div>
-                    <div className="gallery-content">
+                    <div
+                      className="gallery-content"
+                      ref={this.setGalleryContentRef}
+                    >
                       <div className="gallery-top">
-                        <div className="gallery-top--inner" />
+                        {title && <div className="gallery-top--inner">{title}</div>}
                       </div>
                       <Gallery
                         phrases={phrases}

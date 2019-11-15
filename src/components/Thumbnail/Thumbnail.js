@@ -16,6 +16,7 @@ import {
   THUMBNAIL_WIDTH,
   THUMBNAIL_HEIGHT,
 } from '../../constants';
+import DimensionsShape from '../../shapes/DimensionsShape';
 
 const thumbnailStyle = {
   width: THUMBNAIL_WIDTH,
@@ -26,14 +27,23 @@ const propTypes = forbidExtraProps({
   active: PropTypes.bool,
   photo: PhotoShape,
   onPress: PropTypes.func,
+  onLoad: PropTypes.func,
+  onError: PropTypes.func,
   number: nonNegativeInteger,
+  dimensions: DimensionsShape,
 });
 
 const defaultProps = {
   active: false,
   photo: null,
   onPress: noop,
+  onLoad: noop,
+  onError: noop,
   number: 0,
+  dimensions: {
+    height: 0,
+    width: 0
+  },
 };
 
 class Thumbnail extends PureComponent {
@@ -42,6 +52,8 @@ class Thumbnail extends PureComponent {
       active,
       photo,
       onPress,
+      onLoad,
+      onError,
       number,
     } = this.props;
 
@@ -64,6 +76,8 @@ class Thumbnail extends PureComponent {
           src={photo.thumbnail || photo.photo}
           className="thumbnail"
           style={thumbnailStyle}
+          onLoad={(target) => onLoad(target, number)}
+          onError={(target) => onError(target, number)}
         />
       </button>
     );

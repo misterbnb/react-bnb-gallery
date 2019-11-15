@@ -24,4 +24,6 @@ export default forbidExtraProps({
   phrases: PropTypes.shape(getPhrasePropTypes(defaultPhrases)),
   light: PropTypes.bool,
   backgroundColor: PropTypes.string,
+  // custom props
+  onThumbnailPress: PropTypes.func,
 });

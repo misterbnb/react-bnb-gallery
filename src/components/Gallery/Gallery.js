@@ -112,7 +112,9 @@ class Gallery extends PureComponent {
   }
 
   onThumbnailPress(index) {
+    const { onThumbnailPress } = this.props;
     this.to(index);
+    onThumbnailPress();
   }
 
   getPhotoByIndex(index) {

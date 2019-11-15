@@ -44,6 +44,7 @@ class Image extends Component {
     };
     this.onLoad = this.onLoad.bind(this);
     this.onError = this.onError.bind(this);
+    this.setImgRef = this.setImgRef.bind(this);
   }
 
   static getDerivedStateFromProps(nextProps, prevState) {
@@ -60,11 +61,15 @@ class Image extends Component {
     return null;
   }
 
+  setImgRef(element) {
+    this.imgRef = element;
+  }
+
   onLoad() {
     const { onLoad } = this.props;
     // wait a bit to show the final picture
     setTimeout(() => {
-      onLoad();
+      onLoad(this.imgRef);
       this.setState({
         loading: false,
         withError: false,
@@ -74,7 +79,7 @@ class Image extends Component {
 
   onError() {
     const { onError } = this.props;
-    onError();
+    onError(this.imgRef);
     this.setState({
       loading: false,
       withError: true,
@@ -111,6 +116,7 @@ class Image extends Component {
     // picture only if no error ocurred
     if (!withError) {
       components.push(<img
+        ref={this.setImgRef}
         alt={alt}
         key=".pictureComponent"
         className={classnames(classNames)}

@@ -1,4 +1,4 @@
-import React, { PureComponent } from 'react';
+import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 
 import classnames from 'classnames';
@@ -6,9 +6,6 @@ import noop from '../../utils/noop';
 
 import Thumbnail from '../Thumbnail';
 import TogglePhotoList from '../TogglePhotoList';
-
-import calculateThumbnailsContainerDimension from '../../utils/calculateThumbnailsContainerDimension';
-import calculateThumbnailsLeftScroll from '../../utils/calculateThumbnailsLeftScroll';
 
 import defaultPhrases from '../../defaultPhrases';
 import getPhrasePropTypes from '../../utils/getPhrasePropTypes';
@@ -19,6 +16,8 @@ import {
 } from '../../common/prop-types';
 
 import PhotosShape from '../../shapes/PhotosShape';
+import calculateThumbnailsLeftScrollByImageDimensions from '../../utils/calculateThumbnailsLeftScrollByImageDimensions';
+import calculateThumbnailsContainerDimensionByImageDimensions from '../../utils/calculateThumbnailsContainerDimensionByImageDimensions';
 
 const propTypes = forbidExtraProps({
   showThumbnails: PropTypes.bool,
@@ -36,7 +35,7 @@ const defaultProps = {
   phrases: defaultPhrases,
 };
 
-class Caption extends PureComponent {
+class Caption extends Component {
   constructor(props) {
     super(props);
     const {
@@ -45,7 +44,9 @@ class Caption extends PureComponent {
     } = this.props;
 
     this.state = {
+      photos,
       showThumbnails,
+      dimensions: {},
     };
 
     this.thumbnailsWrapperRef = null;
@@ -55,6 +56,8 @@ class Caption extends PureComponent {
     this.setGalleryFigcaptionRef = this.setGalleryFigcaptionRef.bind(this);
     this.setGalleryThubmanilsRef = this.setGalleryThubmanilsRef.bind(this);
     this.toggleThumbnails = this.toggleThumbnails.bind(this);
+    this.onThumbnailLoad = this.onThumbnailLoad.bind(this);
+    this.onThumbnailError = this.onThumbnailError.bind(this);
   }
 
   componentDidUpdate(prevProps) {
@@ -64,26 +67,50 @@ class Caption extends PureComponent {
     }
   }
 
+  shouldComponentUpdate(nextProps, nextState) {
+    const { photos } = this.state;
+    return Object.keys(nextState.dimensions).length === 0 ||
+           Object.keys(nextState.dimensions).length === photos.length ||
+           nextState.photos.length !== photos.length;
+  }
+
   onThumbnailPress(event) {
     const {
       onPress,
-      photos,
     } = this.props;
+    const {
+      photos,
+    } = this.state;
     const index = parseInt(event.currentTarget.dataset.photoIndex, 10);
     if (index >= 0 && index <= photos.length - 1) {
       onPress(index);
     }
   }
 
+  onThumbnailLoad(image, index) {
+    const { dimensions } = this.state;
+    dimensions[index] = { height: image.offsetHeight, width: image.offsetWidth };
+    this.setState({ dimensions: dimensions });
+  }
+
+  onThumbnailError(image, index) {
+    const { photos } = this.state;
+    photos.splice(index, 1);
+    this.hasMoreThanOnePhoto = photos.length > 1;
+    this.setState({ photos });
+  }
+
   setThumbnailsWrapperScrollLeft(current) {
-    const { photos } = this.props;
+    const { dimensions, photos } = this.state;
+    if (!dimensions[current] || !dimensions[current].width) return;
     const bounding = this.thumbnailsWrapperRef.getBoundingClientRect();
-    const scrollLeft = calculateThumbnailsLeftScroll(current, photos.length, bounding);
+    // const scrollLeft = calculateThumbnailsLeftScroll(current, photos.length, bounding);
+    const scrollLeft = calculateThumbnailsLeftScrollByImageDimensions(current, dimensions, bounding);
     this.thumbnailsListRef.style.marginLeft = `${scrollLeft}px`;
   }
 
   getPhotoByIndex(index) {
-    const { photos } = this.props;
+    const { photos } = this.state;
     return photos[index];
   }
 
@@ -101,7 +128,7 @@ class Caption extends PureComponent {
     }));
   }
 
-  renderThumbnail(photo, index, onPress) {
+  renderThumbnail(photo, index, onPress, onLoad) {
     const { current } = this.props;
 
     return (
@@ -109,6 +136,8 @@ class Caption extends PureComponent {
         active={index === current}
         photo={photo}
         onPress={onPress}
+        onLoad={onLoad}
+        onError={(image) => this.onThumbnailError(image, index)}
         number={index}
       />
     );
@@ -117,12 +146,14 @@ class Caption extends PureComponent {
   render() {
     const {
       current,
-      photos,
       phrases,
+      onLoad,
     } = this.props;
 
     const {
+      photos,
       showThumbnails,
+      dimensions
     } = this.state;
 
     const className = classnames(
@@ -131,7 +162,8 @@ class Caption extends PureComponent {
     );
 
     const currentPhoto = this.getPhotoByIndex(current);
-    const captionThumbnailsWrapperWidth = calculateThumbnailsContainerDimension(photos.length);
+    // const captionThumbnailsWrapperWidth = calculateThumbnailsContainerDimension(photos.length);
+    const captionThumbnailsWrapperWidth = calculateThumbnailsContainerDimensionByImageDimensions(dimensions);
 
     return (
       <figcaption className={className}>
@@ -176,7 +208,7 @@ class Caption extends PureComponent {
                   >
                     {photos.map((photo, index) => (
                       <li key={photo.photo}>
-                        {this.renderThumbnail(photo, index, this.onThumbnailPress)}
+                        {this.renderThumbnail(photo, index, this.onThumbnailPress, this.onThumbnailLoad)}
                       </li>
                     ))}
                   </ul>

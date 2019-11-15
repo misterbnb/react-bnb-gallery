@@ -19,4 +19,6 @@ export default {
   phrases: defaultPhrases,
   light: false,
   backgroundColor: DEFAULT_COLOR,
+  // custom props
+  onThumbnailPress: noop,
 };

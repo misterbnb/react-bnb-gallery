@@ -326,10 +326,16 @@ function (_Component) {
     }, defaultState);
     _this.onLoad = _this.onLoad.bind(assertThisInitialized(_this));
     _this.onError = _this.onError.bind(assertThisInitialized(_this));
+    _this.setImgRef = _this.setImgRef.bind(assertThisInitialized(_this));
     return _this;
   }
 
   createClass(Image, [{
+    key: "setImgRef",
+    value: function setImgRef(element) {
+      this.imgRef = element;
+    }
+  }, {
     key: "onLoad",
     value: function onLoad() {
       var _this2 = this;
@@ -337,7 +343,7 @@ function (_Component) {
       var onLoad = this.props.onLoad; // wait a bit to show the final picture
 
       setTimeout(function () {
-        onLoad();
+        onLoad(_this2.imgRef);
 
         _this2.setState({
           loading: false,
@@ -349,7 +355,7 @@ function (_Component) {
     key: "onError",
     value: function onError() {
       var onError = this.props.onError;
-      onError();
+      onError(this.imgRef);
       this.setState({
         loading: false,
         withError: true
@@ -380,6 +386,7 @@ function (_Component) {
 
       if (!withError) {
         components.push(React.createElement("img", {
+          ref: this.setImgRef,
           alt: alt,
           key: ".pictureComponent",
           className: classnames(classNames),
@@ -534,6 +541,8 @@ var propTypes$3 = forbidExtraProps({
   active: PropTypes.bool,
   photo: PhotoShape,
   onPress: PropTypes.func,
+  onLoad: PropTypes.func,
+  onError: PropTypes.func,
   number: nonNegativeInteger,
   dimensions: DimensionsShape
 });
@@ -541,6 +550,8 @@ var defaultProps$3 = {
   active: false,
   photo: null,
   onPress: noop,
+  onLoad: noop,
+  onError: noop,
   number: 0,
   dimensions: {
     height: 0,
@@ -567,6 +578,7 @@ function (_PureComponent) {
           photo = _this$props.photo,
           onPress = _this$props.onPress,
           _onLoad = _this$props.onLoad,
+          _onError = _this$props.onError,
           number = _this$props.number;
       var className = classnames('thumbnail-button', active && 'active');
       return React.createElement("button", {
@@ -581,8 +593,11 @@ function (_PureComponent) {
         src: photo.thumbnail || photo.photo,
         className: "thumbnail",
         style: thumbnailStyle,
-        onLoad: function onLoad(e) {
-          return _onLoad(e, number);
+        onLoad: function onLoad(target) {
+          return _onLoad(target, number);
+        },
+        onError: function onError(target) {
+          return _onError(target, number);
         }
       }));
     }
@@ -641,35 +656,32 @@ function (_PureComponent) {
 TogglePhotoList.propTypes = propTypes$4;
 TogglePhotoList.defaultProps = defaultProps$4;
 
-function calculateThumbnailsContainerDimension(total) {
-  return THUMBNAIL_WIDTH * total + (THUMBNAIL_OFFSET * total - THUMBNAIL_OFFSET);
+function calculateThumbnailsContainerDimensionByImageDimensions(dimensions) {
+  return Object.keys(dimensions).reduce(function (a, key) {
+    return a + (dimensions[key].width || 0) + THUMBNAIL_OFFSET;
+  }, 0) - THUMBNAIL_OFFSET;
 }
 
-function calculateThumbnailsLeftScroll(current, total, bounding) {
-  var half = bounding.width / 2 - THUMBNAIL_WIDTH / 2;
-  var thumbnailsOffset = current * THUMBNAIL_WIDTH + current * THUMBNAIL_OFFSET - half;
-  var calculatedScrollLeft = 0;
+function calculateThumbnailsLeftScrollByImageDimensions(current, dimensions, bounding) {
+  var currentThumbnailWidth = dimensions[current].width;
+  var allThumbnailsWidth = calculateThumbnailsContainerDimensionByImageDimensions(dimensions);
+  var allThumbnailsBounding = bounding.width;
+  var minX = 0;
+  var maxX = allThumbnailsWidth > allThumbnailsBounding ? allThumbnailsWidth - allThumbnailsBounding : 0;
+  var thumbnailsOffset = Object.values(dimensions).slice(0, current + 1).reduce(function (a, d) {
+    return a + (d.width || 0) + THUMBNAIL_OFFSET;
+  }, 0);
+  var calculatedScrollLeft = thumbnailsOffset - allThumbnailsBounding / 2 - currentThumbnailWidth / 2;
 
-  if (thumbnailsOffset < 0) {
-    return calculatedScrollLeft;
-  }
-
-  var thumbnailsPerRow = bounding.width / (THUMBNAIL_WIDTH + THUMBNAIL_OFFSET);
-  var thumbnailsHalf = Math.round(thumbnailsPerRow / 2);
-  var thumbnailsLeft = total - (current + 1);
-
-  if (thumbnailsLeft < thumbnailsHalf) {
-    calculatedScrollLeft = calculateThumbnailsContainerDimension(total) - bounding.width;
-  } else {
-    calculatedScrollLeft = thumbnailsOffset;
+  if (calculatedScrollLeft < minX) {
+    calculatedScrollLeft = 0;
+  } else if (calculatedScrollLeft > maxX) {
+    calculatedScrollLeft = maxX;
   }
 
   return -Math.abs(calculatedScrollLeft);
 }
 
-function ownKeys$3(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
-
-function _objectSpread$3(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$3(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$3(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 var propTypes$5 = forbidExtraProps({
   showThumbnails: PropTypes.bool,
   current: nonNegativeInteger,
@@ -687,8 +699,8 @@ var defaultProps$5 = {
 
 var Caption =
 /*#__PURE__*/
-function (_PureComponent) {
-  inherits(Caption, _PureComponent);
+function (_Component) {
+  inherits(Caption, _Component);
 
   function Caption(props) {
     var _this;
@@ -700,6 +712,7 @@ function (_PureComponent) {
         showThumbnails = _this$props.showThumbnails,
         photos = _this$props.photos;
     _this.state = {
+      photos: photos,
       showThumbnails: showThumbnails,
       dimensions: {}
     };
@@ -710,15 +723,12 @@ function (_PureComponent) {
     _this.setGalleryFigcaptionRef = _this.setGalleryFigcaptionRef.bind(assertThisInitialized(_this));
     _this.setGalleryThubmanilsRef = _this.setGalleryThubmanilsRef.bind(assertThisInitialized(_this));
     _this.toggleThumbnails = _this.toggleThumbnails.bind(assertThisInitialized(_this));
+    _this.onThumbnailLoad = _this.onThumbnailLoad.bind(assertThisInitialized(_this));
+    _this.onThumbnailError = _this.onThumbnailError.bind(assertThisInitialized(_this));
     return _this;
   }
 
   createClass(Caption, [{
-    key: "componentDidMount",
-    value: function componentDidMount() {
-      this.photos = this.props.photos;
-    }
-  }, {
     key: "componentDidUpdate",
     value: function componentDidUpdate(prevProps) {
       var current = this.props.current;
@@ -728,11 +738,16 @@ function (_PureComponent) {
       }
     }
   }, {
+    key: "shouldComponentUpdate",
+    value: function shouldComponentUpdate(nextProps, nextState) {
+      var photos = this.state.photos;
+      return Object.keys(nextState.dimensions).length === 0 || Object.keys(nextState.dimensions).length === photos.length || nextState.photos.length !== photos.length;
+    }
+  }, {
     key: "onThumbnailPress",
     value: function onThumbnailPress(event) {
-      var _this$props2 = this.props,
-          onPress = _this$props2.onPress,
-          photos = _this$props2.photos;
+      var onPress = this.props.onPress;
+      var photos = this.state.photos;
       var index = parseInt(event.currentTarget.dataset.photoIndex, 10);
 
       if (index >= 0 && index <= photos.length - 1) {
@@ -741,30 +756,42 @@ function (_PureComponent) {
     }
   }, {
     key: "onThumbnailLoad",
-    value: function onThumbnailLoad(_ref, index) {
-      var image = _ref.target;
-      this.setState(function (prevState) {
-        return {
-          dimensions: defineProperty({}, index, _objectSpread$3({}, prevState.dimensions[index], {
-            height: image.offsetHeight,
-            width: image.offsetWidth
-          }))
-        };
+    value: function onThumbnailLoad(image, index) {
+      var dimensions = this.state.dimensions;
+      dimensions[index] = {
+        height: image.offsetHeight,
+        width: image.offsetWidth
+      };
+      this.setState({
+        dimensions: dimensions
+      });
+    }
+  }, {
+    key: "onThumbnailError",
+    value: function onThumbnailError(image, index) {
+      var photos = this.state.photos;
+      photos.splice(index, 1);
+      this.hasMoreThanOnePhoto = photos.length > 1;
+      this.setState({
+        photos: photos
       });
     }
   }, {
     key: "setThumbnailsWrapperScrollLeft",
     value: function setThumbnailsWrapperScrollLeft(current) {
-      console.log(this.state);
-      var photos = this.props.photos;
-      var bounding = this.thumbnailsWrapperRef.getBoundingClientRect();
-      var scrollLeft = calculateThumbnailsLeftScroll(current, photos.length, bounding);
+      var _this$state = this.state,
+          dimensions = _this$state.dimensions,
+          photos = _this$state.photos;
+      if (!dimensions[current] || !dimensions[current].width) return;
+      var bounding = this.thumbnailsWrapperRef.getBoundingClientRect(); // const scrollLeft = calculateThumbnailsLeftScroll(current, photos.length, bounding);
+
+      var scrollLeft = calculateThumbnailsLeftScrollByImageDimensions(current, dimensions, bounding);
       this.thumbnailsListRef.style.marginLeft = "".concat(scrollLeft, "px");
     }
   }, {
     key: "getPhotoByIndex",
     value: function getPhotoByIndex(index) {
-      var photos = this.props.photos;
+      var photos = this.state.photos;
       return photos[index];
     }
   }, {
@@ -789,29 +816,37 @@ function (_PureComponent) {
   }, {
     key: "renderThumbnail",
     value: function renderThumbnail(photo, index, onPress, onLoad) {
+      var _this2 = this;
+
       var current = this.props.current;
       return React.createElement(Thumbnail, {
         active: index === current,
         photo: photo,
         onPress: onPress,
         onLoad: onLoad,
+        onError: function onError(image) {
+          return _this2.onThumbnailError(image, index);
+        },
         number: index
       });
     }
   }, {
     key: "render",
     value: function render() {
-      var _this2 = this;
+      var _this3 = this;
 
-      var _this$props3 = this.props,
-          current = _this$props3.current,
-          photos = _this$props3.photos,
-          phrases = _this$props3.phrases,
-          onLoad = _this$props3.onLoad;
-      var showThumbnails = this.state.showThumbnails;
+      var _this$props2 = this.props,
+          current = _this$props2.current,
+          phrases = _this$props2.phrases,
+          onLoad = _this$props2.onLoad;
+      var _this$state2 = this.state,
+          photos = _this$state2.photos,
+          showThumbnails = _this$state2.showThumbnails,
+          dimensions = _this$state2.dimensions;
       var className = classnames('gallery-figcaption', !showThumbnails && 'hide');
-      var currentPhoto = this.getPhotoByIndex(current);
-      var captionThumbnailsWrapperWidth = calculateThumbnailsContainerDimension(photos.length);
+      var currentPhoto = this.getPhotoByIndex(current); // const captionThumbnailsWrapperWidth = calculateThumbnailsContainerDimension(photos.length);
+
+      var captionThumbnailsWrapperWidth = calculateThumbnailsContainerDimensionByImageDimensions(dimensions);
       return React.createElement("figcaption", {
         className: className
       }, React.createElement("div", {
@@ -847,20 +882,20 @@ function (_PureComponent) {
       }, photos.map(function (photo, index) {
         return React.createElement("li", {
           key: photo.photo
-        }, _this2.renderThumbnail(photo, index, _this2.onThumbnailPress, _this2.onThumbnailLoad));
+        }, _this3.renderThumbnail(photo, index, _this3.onThumbnailPress, _this3.onThumbnailLoad));
       })))))));
     }
   }]);
 
   return Caption;
-}(PureComponent);
+}(Component);
 
 Caption.propTypes = propTypes$5;
 Caption.defaultProps = defaultProps$5;
 
-function ownKeys$4(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys$3(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
-function _objectSpread$4(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$4(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$4(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+function _objectSpread$3(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$3(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$3(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 var controlStyle = {
   height: '2.8em',
   width: '2.8em',
@@ -928,7 +963,7 @@ function (_React$PureComponent) {
         role: "presentation",
         focusable: "false",
         "aria-hidden": "true",
-        style: _objectSpread$4({}, controlStyle, {}, light && controlStyleLight)
+        style: _objectSpread$3({}, controlStyle, {}, light && controlStyleLight)
       }, React.createElement("path", {
         d: arrow,
         fillRule: "evenodd"
@@ -1034,13 +1069,13 @@ function (_PureComponent) {
 NextButton.propTypes = propTypes$8;
 NextButton.defaultProps = defaultProps$8;
 
-function ownKeys$5(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys$4(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
-function _objectSpread$5(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$5(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$5(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+function _objectSpread$4(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$4(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$4(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 
-var propTypes$9 = _objectSpread$5({}, galleryPropTypes);
+var propTypes$9 = _objectSpread$4({}, galleryPropTypes);
 
-var defaultProps$9 = _objectSpread$5({}, galleryDefaultProps);
+var defaultProps$9 = _objectSpread$4({}, galleryDefaultProps);
 
 var Gallery =
 /*#__PURE__*/
@@ -1351,9 +1386,9 @@ function (_PureComponent) {
 Gallery.propTypes = propTypes$9;
 Gallery.defaultProps = defaultProps$9;
 
-function ownKeys$6(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys$5(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
-function _objectSpread$6(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$6(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$6(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+function _objectSpread$5(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$5(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$5(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 var CLOSE_PATH = 'm23.25 24c-.19 0-.38-.07-.53-.22l-10.72-10.72-10.72 10.72c-.29.29-.77.29-1.06 0s-.29-.77 0-1.06l10.72-10.72-10.72-10.72c-.29-.29-.29-.77 0-1.06s.77-.29 1.06 0l10.72 10.72 10.72-10.72c.29-.29.77-.29 1.06 0s .29.77 0 1.06l-10.72 10.72 10.72 10.72c.29.29.29.77 0 1.06-.15.15-.34.22-.53.22';
 var buttonStyle = {
   height: '2em',
@@ -1385,7 +1420,7 @@ var CloseButton = function CloseButton(_ref) {
     viewBox: "0 0 24 24",
     role: "img",
     focusable: "false",
-    style: _objectSpread$6({}, buttonStyle, {}, light && buttonStyleLight)
+    style: _objectSpread$5({}, buttonStyle, {}, light && buttonStyleLight)
   }, React.createElement("path", {
     d: CLOSE_PATH,
     fillRule: "evenodd"
@@ -1404,26 +1439,26 @@ function opacityValidation(props, propName) {
   }
 }
 
-function ownKeys$7(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys$6(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
-function _objectSpread$7(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$7(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$7(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+function _objectSpread$6(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$6(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$6(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
 function processPhoto(photo, index) {
   var props = typeof photo === 'string' ? {
     number: index + 1,
     photo: photo
-  } : _objectSpread$7({}, photo, {
+  } : _objectSpread$6({}, photo, {
     number: index + 1
   });
-  return _objectSpread$7({}, defaultPhotoProps, {}, props);
+  return _objectSpread$6({}, defaultPhotoProps, {}, props);
 }
 function getPhotos(photos) {
   return photos.map(processPhoto);
 }
 
-function ownKeys$8(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
+function ownKeys$7(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); if (enumerableOnly) symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; }); keys.push.apply(keys, symbols); } return keys; }
 
-function _objectSpread$8(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$8(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$8(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
-var propTypes$b = forbidExtraProps(_objectSpread$8({}, galleryPropTypes, {
+function _objectSpread$7(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; if (i % 2) { ownKeys$7(source, true).forEach(function (key) { defineProperty(target, key, source[key]); }); } else if (Object.getOwnPropertyDescriptors) { Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)); } else { ownKeys$7(source).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } } return target; }
+var propTypes$b = forbidExtraProps(_objectSpread$7({}, galleryPropTypes, {
   leftKeyPressed: PropTypes.func,
   onClose: PropTypes.func,
   rightKeyPressed: PropTypes.func,
@@ -1434,21 +1469,19 @@ var propTypes$b = forbidExtraProps(_objectSpread$8({}, galleryPropTypes, {
   // custom props
   className: PropTypes.string,
   title: PropTypes.string,
-  outsideClickClose: PropTypes.bool,
-  onThumbnailPress: PropTypes.func
+  outsideClickClose: PropTypes.bool
 }));
 
-var defaultProps$b = _objectSpread$8({}, galleryDefaultProps, {
+var defaultProps$b = _objectSpread$7({}, galleryDefaultProps, {
   leftKeyPressed: noop,
   onClose: noop,
   rightKeyPressed: noop,
-  onThumbnailPress: noop,
   show: false,
   keyboard: true,
   opacity: DEFAULT_OPACITY,
   zIndex: DEFAULT_Z_INDEX,
   title: '',
-  outsideClickClose: false,
+  outsideClickClose: true,
   className: ''
 });
 
@@ -1471,6 +1504,7 @@ function (_Component) {
     _this.onKeyDown = _this.onKeyDown.bind(assertThisInitialized(_this));
     _this.onClickOutside = _this.onClickOutside.bind(assertThisInitialized(_this));
     _this.setGalleryModalContainerRef = _this.setGalleryModalContainerRef.bind(assertThisInitialized(_this));
+    _this.setGalleryContentRef = _this.setGalleryContentRef.bind(assertThisInitialized(_this));
     return _this;
   }
 
@@ -1497,7 +1531,9 @@ function (_Component) {
   }, {
     key: "onClickOutside",
     value: function onClickOutside(event) {
-      if (event.target === this.galleryModalContainerRef) {
+      if (!this.galleryModalContainerRef || !this.galleryContentRef) return;
+
+      if (!event.target.closest(".".concat(this.galleryContentRef.className)) && event.target.closest(".".concat(this.galleryModalContainerRef.className))) {
         this.close();
       }
     }
@@ -1544,6 +1580,11 @@ function (_Component) {
       this.galleryModalContainerRef = element;
     }
   }, {
+    key: "setGalleryContentRef",
+    value: function setGalleryContentRef(element) {
+      this.galleryContentRef = element;
+    }
+  }, {
     key: "close",
     value: function close() {
       var onClose = this.props.onClose;
@@ -1574,8 +1615,7 @@ function (_Component) {
           nextButtonPressed = _omit.nextButtonPressed,
           prevButtonPressed = _omit.prevButtonPressed,
           showThumbnails = _omit.showThumbnails,
-          preloadSize = _omit.preloadSize,
-          onThumbnailPress = _omit.onThumbnailPress; // modal overlay customization styles
+          preloadSize = _omit.preloadSize; // modal overlay customization styles
 
 
       var galleryModalOverlayStyles = this.getModalOverlayStyles();
@@ -1603,7 +1643,8 @@ function (_Component) {
         onPress: this.close,
         light: light
       })), React.createElement("div", {
-        className: "gallery-content"
+        className: "gallery-content",
+        ref: this.setGalleryContentRef
       }, React.createElement("div", {
         className: "gallery-top"
       }, title && React.createElement("div", {
@@ -1618,7 +1659,6 @@ function (_Component) {
         direction: direction,
         nextButtonPressed: nextButtonPressed,
         prevButtonPressed: prevButtonPressed,
-        onThumbnailPress: prevButtonPressed,
         showThumbnails: showThumbnails,
         preloadSize: preloadSize,
         backgroundColor: null,

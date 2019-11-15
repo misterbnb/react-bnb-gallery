@@ -23,7 +23,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git@github.com:peterpalau/react-bnb-gallery.git"
+    "url": "git@github.com:misterbnb/react-bnb-gallery.git"
   },
   "license": "MIT",
   "main": "dist/index.js",
@@ -36,7 +36,7 @@
     "styles.css"
   ],
   "bugs": {
-    "url": "https://github.com/peterpalau/react-bnb-gallery/issues"
+    "url": "https://github.com/misterbnb/react-bnb-gallery/issues"
   },
   "scripts": {
     "test": "jest --no-cache",
